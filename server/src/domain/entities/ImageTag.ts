@@ -1,4 +1,4 @@
 export interface ImageTag {
-  name: string;
+  label: string;
   confidence: number;
 }
