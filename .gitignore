@@ -3,3 +3,6 @@ dist
 .env
 .DS_Store
 *.local
+smoke_test.txt
+test_image.jpg
+test.txt
