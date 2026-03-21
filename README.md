@@ -49,11 +49,18 @@ Servicios disponibles:
 - Frontend: `http://localhost:5173`
 - Backend: `http://localhost:3000`
 
+Para apagar el entorno:
+
+```bash
+docker-compose down
+```
+
 ## Decisiones Tecnicas
 
 - **Pre-flight check de runtime**: al iniciar el servidor se valida que Node.js sea `>= 18.0.0` para evitar fallos de compatibilidad en entornos locales inconsistentes.
 - **Axios en el adaptador de IA**: se reemplazo `fetch` por `axios` para mejorar portabilidad, manejo de timeouts y consistencia en errores HTTP.
 - **Factory para proveedor de IA**: el proveedor se resuelve por `AI_PROVIDER`, facilitando extension futura a otros vendors.
+- **Nota sobre cuota de API**: Si recibe un error `429` en los logs, es debido a las limitaciones de cuota de la API Key proporcionada en el `.env`. El codigo maneja esto correctamente como `AI_PROVIDER_UNAVAILABLE`.
 
 ## Flujo de pruebas
 

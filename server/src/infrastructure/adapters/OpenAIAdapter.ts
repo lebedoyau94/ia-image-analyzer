@@ -114,12 +114,6 @@ export class OpenAIAdapter implements IAIProvider {
           confidence: item.confidence as number,
         }));
     } catch (error) {
-      console.error(error);
-
-      if (error instanceof AIProviderError) {
-        throw error;
-      }
-
       if (
         typeof error === 'object' &&
         error !== null &&
@@ -127,12 +121,27 @@ export class OpenAIAdapter implements IAIProvider {
         (error as { isAxiosError?: unknown }).isAxiosError === true
       ) {
         const status = (error as { response?: { status?: number } }).response?.status;
+        const errorMessage =
+          typeof (error as { message?: unknown }).message === 'string'
+            ? (error as { message: string }).message
+            : 'OpenAI request error';
+        console.error(`[OpenAIAdapter] ${errorMessage} (status: ${status ?? 'N/A'})`);
+
         const message =
           status != null
             ? `OpenAI request failed with status ${status}`
             : 'OpenAI request failed due to network or timeout';
         throw new AIProviderError(message, 'AI_PROVIDER_UNAVAILABLE');
       }
+
+      if (error instanceof AIProviderError) {
+        console.error(`[OpenAIAdapter] ${error.message}`);
+        throw error;
+      }
+
+      const fallbackMessage =
+        error instanceof Error ? error.message : 'Unexpected unknown error';
+      console.error(`[OpenAIAdapter] ${fallbackMessage}`);
 
       throw new AIProviderError(
         'Unexpected error while analyzing image with OpenAI',
