@@ -114,17 +114,13 @@ export class OpenAIAdapter implements IAIProvider {
           confidence: item.confidence as number,
         }));
     } catch (error) {
-      if (
-        typeof error === 'object' &&
-        error !== null &&
-        'isAxiosError' in error &&
-        (error as { isAxiosError?: unknown }).isAxiosError === true
-      ) {
-        const status = (error as { response?: { status?: number } }).response?.status;
-        const errorMessage =
-          typeof (error as { message?: unknown }).message === 'string'
-            ? (error as { message: string }).message
-            : 'OpenAI request error';
+      if (axios.isAxiosError(error)) {
+        const axiosError = error as unknown as {
+          message?: string;
+          response?: { status?: number };
+        };
+        const status = axiosError.response?.status;
+        const errorMessage = axiosError.message ?? 'OpenAI request error';
         console.error(`[OpenAIAdapter] ${errorMessage} (status: ${status ?? 'N/A'})`);
 
         const message =
