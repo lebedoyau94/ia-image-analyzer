@@ -1,12 +1,12 @@
+import axios from 'axios';
 import { ImageTag } from '../../domain/entities/ImageTag';
 import { IAIProvider } from '../../domain/ports/IAIProvider';
 
 interface OpenAIResponse {
-  output?: Array<{
-    content?: Array<{
-      type?: string;
-      text?: string;
-    }>;
+  choices?: Array<{
+    message?: {
+      content?: string;
+    };
   }>;
 }
 
@@ -42,45 +42,42 @@ export class OpenAIAdapter implements IAIProvider {
     const imageBase64 = imageBuffer.toString('base64');
 
     try {
-      const response = await fetch(`${this.baseUrl}/responses`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const response = await axios.post<OpenAIResponse>(
+        `${this.baseUrl}/chat/completions`,
+        {
           model: this.model,
-          input: [
+          messages: [
             {
               role: 'user',
               content: [
                 {
-                  type: 'input_text',
+                  type: 'text',
                   text:
-                    'Return only a JSON array of tags for this image. ' +
-                    'Each item must include: label (string), confidence (0 to 1 number).',
+                    'Analyze this image and provide tags with confidence. ' +
+                    'Return ONLY a valid JSON array. No markdown, no explanations. ' +
+                    'Each item must include: label (string), confidence (number from 0 to 1).',
                 },
                 {
-                  type: 'input_image',
-                  image_url: `data:image/jpeg;base64,${imageBase64}`,
+                  type: 'image_url',
+                  image_url: {
+                    url: `data:image/jpeg;base64,${imageBase64}`,
+                  },
                 },
               ],
             },
           ],
-        }),
-      });
+        },
+        {
+          timeout: 30000,
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
 
-      if (!response.ok) {
-        throw new AIProviderError(
-          `OpenAI request failed with status ${response.status}`,
-          'AI_PROVIDER_UNAVAILABLE',
-        );
-      }
-
-      const data = (await response.json()) as OpenAIResponse;
-      const outputText =
-        data.output?.flatMap((item) => item.content ?? []).find((content) => content.type === 'output_text')
-          ?.text ?? '';
+      const data = response.data;
+      const outputText = data.choices?.[0]?.message?.content ?? '';
 
       if (!outputText) {
         throw new AIProviderError(
@@ -89,7 +86,13 @@ export class OpenAIAdapter implements IAIProvider {
         );
       }
 
-      const parsed = JSON.parse(outputText) as Array<{
+      const cleanedOutput = outputText
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/\s*```$/i, '')
+        .trim();
+
+      const parsed = JSON.parse(cleanedOutput) as Array<{
         label: unknown;
         confidence: unknown;
       }>;
@@ -111,8 +114,24 @@ export class OpenAIAdapter implements IAIProvider {
           confidence: item.confidence as number,
         }));
     } catch (error) {
+      console.error(error);
+
       if (error instanceof AIProviderError) {
         throw error;
+      }
+
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'isAxiosError' in error &&
+        (error as { isAxiosError?: unknown }).isAxiosError === true
+      ) {
+        const status = (error as { response?: { status?: number } }).response?.status;
+        const message =
+          status != null
+            ? `OpenAI request failed with status ${status}`
+            : 'OpenAI request failed due to network or timeout';
+        throw new AIProviderError(message, 'AI_PROVIDER_UNAVAILABLE');
       }
 
       throw new AIProviderError(
