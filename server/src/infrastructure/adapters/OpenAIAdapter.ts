@@ -115,14 +115,12 @@ export class OpenAIAdapter implements IAIProvider {
         }));
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        const axiosError = error as unknown as {
-          message?: string;
-          response?: { status?: number };
-        };
-        const status = axiosError.response?.status;
-        const errorMessage = axiosError.message ?? 'OpenAI request error';
-        console.error(`[OpenAIAdapter] ${errorMessage} (status: ${status ?? 'N/A'})`);
+        console.error('[OpenAIAdapter Error]', {
+          message: error.message,
+          status: error.response?.status,
+        });
 
+        const status = error.response?.status;
         const message =
           status != null
             ? `OpenAI request failed with status ${status}`
@@ -131,13 +129,13 @@ export class OpenAIAdapter implements IAIProvider {
       }
 
       if (error instanceof AIProviderError) {
-        console.error(`[OpenAIAdapter] ${error.message}`);
+        console.error('[OpenAIAdapter Error]', { message: error.message });
         throw error;
       }
 
       const fallbackMessage =
         error instanceof Error ? error.message : 'Unexpected unknown error';
-      console.error(`[OpenAIAdapter] ${fallbackMessage}`);
+      console.error('[OpenAIAdapter Error]', { message: fallbackMessage });
 
       throw new AIProviderError(
         'Unexpected error while analyzing image with OpenAI',
